@@ -1,15 +1,6 @@
-# =========================================================
-# DIABETES - Naive Bayes vs SVM (FAST)
-# Outputs:
-#  - model_karsilastirma_sonuclari.csv
-#  - model_ciktilari.txt
-#  - roc_naive_bayes.png
-#  - roc_svm_fast.png
-# =========================================================
 
-# 0) Temizle
 rm(list = ls())
-cat("\014")  # console temizler 
+cat("\014")  
 
 # 1) Paketler
 required_pkgs <- c("caret", "pROC", "e1071", "LiblineaR")
@@ -23,7 +14,7 @@ library(LiblineaR)
 
 set.seed(42)
 
-# 2) Dosya oku
+
 file_path <- "diabetes_prediction_dataset.csv"
 if (!file.exists(file_path)) {
   stop(paste("Dosya bulunamadı:", file_path, "."))
@@ -31,20 +22,20 @@ if (!file.exists(file_path)) {
 
 data <- read.csv(file_path, stringsAsFactors = FALSE)
 
-# 3) Hedef değişken: diabetes
+
 if (!("diabetes" %in% names(data))) stop
 
-# diabetes kolonunu factor yap (0/1 ise No/Yes'e çevir)
+
 if (is.numeric(data$diabetes) || is.integer(data$diabetes)) {
   data$diabetes <- ifelse(data$diabetes == 1, "Yes", "No")
 }
 data$diabetes <- factor(data$diabetes, levels = c("No","Yes"))
 
-# 4) Karakter kolonları faktöre çevir (smoking_history gibi)
+
 char_cols <- names(data)[sapply(data, is.character)]
 for (cc in char_cols) data[[cc]] <- as.factor(data[[cc]])
 
-# 5) Train/Test böl
+
 idx <- createDataPartition(data$diabetes, p = 0.8, list = FALSE)
 train_df <- data[idx, ]
 test_df  <- data[-idx, ]
@@ -54,7 +45,7 @@ cat("Toplam:", nrow(data), "satir,", ncol(data), "sutun\n")
 cat("Train :", nrow(train_df), "\n")
 cat("Test  :", nrow(test_df), "\n\n")
 
-# 6) Ortak metrik fonksiyonları
+
 safe_div <- function(a, b) ifelse(b == 0, 0, a / b)
 
 metrics_from_preds <- function(y_true, y_pred) {
@@ -66,9 +57,7 @@ metrics_from_preds <- function(y_true, y_pred) {
   list(confusion = cm, accuracy = acc, precision = prec, recall = rec, f1 = f1)
 }
 
-# =========================================================
-# 7) NAIVE BAYES
-# =========================================================
+
 cat("===== NAIVE BAYES =====\n")
 nb_model <- naiveBayes(diabetes ~ ., data = train_df)
 
@@ -82,15 +71,12 @@ nb_auc <- as.numeric(auc(nb_roc))
 print(nb_m$confusion)
 cat("Naive Bayes AUC:", nb_auc, "\n\n")
 
-# ROC (ekrana + PNG)
 plot(nb_roc, main = "Naive Bayes ROC Curve")
 png("roc_naive_bayes.png", width = 900, height = 650)
 plot(nb_roc, main = "Naive Bayes ROC Curve")
 dev.off()
 
-# =========================================================
-# 8) SVM (FAST) - LiblineaR
-# =========================================================
+
 cat("===== SVM (FAST - LiblineaR) =====\n")
 max_train <- 20000
 if (nrow(train_df) > max_train) {
@@ -105,11 +91,10 @@ x_test_df  <- subset(test_df,    select = -diabetes)
 y_train <- train_fast$diabetes
 y_test  <- test_df$diabetes
 
-# Dummy encode
 x_train_mm <- model.matrix(~ . - 1, data = x_train_df)
 x_test_mm  <- model.matrix(~ . - 1, data = x_test_df)
 
-# Kolon hizalama
+
 missing_cols <- setdiff(colnames(x_train_mm), colnames(x_test_mm))
 if (length(missing_cols) > 0) {
   add <- matrix(0, nrow = nrow(x_test_mm), ncol = length(missing_cols))
@@ -124,10 +109,10 @@ center <- attr(x_train_sc, "scaled:center")
 scal   <- attr(x_train_sc, "scaled:scale")
 x_test_sc  <- scale(x_test_mm, center = center, scale = scal)
 
-# LiblineaR label 0/1
+#
 y_train_bin <- ifelse(y_train == "Yes", 1, 0)
 
-# type=0: logistic regression + proba
+
 svm_model <- LiblineaR(data = x_train_sc, target = y_train_bin, type = 0)
 
 svm_pred_obj <- predict(svm_model, x_test_sc, proba = TRUE)
@@ -148,9 +133,7 @@ png("roc_svm_fast.png", width = 900, height = 650)
 plot(svm_roc, main = "SVM (FAST - LiblineaR) ROC Curve")
 dev.off()
 
-# =========================================================
-# 9) Sonuç tablosu + dosyalara yaz
-# =========================================================
+
 results <- data.frame(
   Model     = c("Naive_Bayes", "SVM_Fast_LiblineaR"),
   Accuracy  = c(nb_m$accuracy,  svm_m$accuracy),
